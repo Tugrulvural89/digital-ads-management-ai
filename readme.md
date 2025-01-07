@@ -1,5 +1,5 @@
 # Ad Platform Project Structure
-my-project/
+ ``` my-project/
 ├── backend/                         # FastAPI backend
 │   ├── app/                         # FastAPI app folder
 │   │   ├── __init__.py
@@ -32,7 +32,7 @@ my-project/
 ├── .env                              # Global environment variables (optional)
 ├── docker-compose.yml               # Unified docker-compose file (includes all services)
 └── README.md                        # Project documentation
-
+ ```
 
 # Ad Platform Project
 
