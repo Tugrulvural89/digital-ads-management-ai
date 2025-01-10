@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
-import axios from 'axios';
+import {
+  exchangeAuthCodeForTokens,
+  saveGoogleCredentials,
+} from '../services/googleAuthServices';
+import {
+  fetchGoogleAdsAccounts,
+  saveAdAccount,
+} from '../services/googleAdAccountServices';
+import { AdAccount } from '../types/adAccount';
+import { useNavigate } from 'react-router-dom';
 
 
-interface AdAccount {
-  account_id: string;
-  name: string;
-}
+
+
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID as string;
 
@@ -22,70 +29,32 @@ const GoogleAdsConnectWrapper: React.FC = () => {
   );
 };
 
+
 const GoogleAdsConnect: React.FC = () => {
   const [adAccounts, setAdAccounts] = useState<AdAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [token, setToken] = useState<string>('');
-  const [refreshToken, setRefreshToken] = useState<string>('');
 
-  // Google login with Auth Code Flow
+  const navigate = useNavigate();
+
   const googleLogin = useGoogleLogin({
     scope: 'https://www.googleapis.com/auth/adwords',
     flow: 'auth-code',
     onSuccess: async (response) => {
-      console.log('Google login response:', response);
       try {
         setIsLoading(true);
         setError('');
+        const { code } = response;
 
-        const { code } = response; // Yetkilendirme kodunu al
-        console.log('Access Token:', code);
-        // Yetkilendirme kodunu access token ve refresh token için backend'e gönder
-        const tokenResponse = await axios.post('http://localhost:8000/api/v1/google/auth', {
-          code: code || '',
-        }, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-          }
-        }
-        );
-        console.log('tokenResponse  response:', tokenResponse);
-       
-        const { access_token, refresh_token } = tokenResponse.data;
-        // Save Google credentials to the server
-        const response_save = await axios.post('http://localhost:8000/api/v1/save-credentials', {
-          access_token: access_token,  // Doğrudan token bilgilerini gönder
-          refresh_token: refresh_token
-        }, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-            "Content-Type": "application/json",
-          }
-        });
+        const { access_token, refresh_token } = await exchangeAuthCodeForTokens(code);
+        await saveGoogleCredentials(access_token, refresh_token);
 
-        console.log('tokenResponse  response:', response_save);
-
-        console.log('Access Token:', access_token);
-        console.log('Refresh Token:', refresh_token);
-
-        // Fetch Google Ads accounts
-        const responseAdAccounts = await axios.post('http://localhost:8000/api/v1/google-ad-accounts', {
-          access_token,
-        });
-
-        const accounts = responseAdAccounts.data.resourceNames.map((resourceName: string) => {
-          const accountId = resourceName.split('/')[1];
-          const accountName = resourceName.split('/')[0];
-          return {
-            account_id: accountId,
-            name: `Account ${accountName}`,
-          };
-        });
-
+        const accounts = await fetchGoogleAdsAccounts(access_token);
         setAdAccounts(accounts);
+
+
 
       } catch (err) {
         setError('Failed to fetch Google Ads accounts');
@@ -109,17 +78,9 @@ const GoogleAdsConnect: React.FC = () => {
       setIsSubmitting(true);
       setError('');
 
-      const response = await axios.post('http://localhost:8000/api/v1/save-ad-account', {
-        account_id: selectedAccount,
-        channel: "Google",
-      }, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-      });
-
-      console.log('Account saved:', response.data);
+      await saveAdAccount(selectedAccount);
       alert('Account saved successfully!');
+      navigate('/campaigns');
     } catch (err) {
       setError('Failed to save the selected account');
       console.error(err);

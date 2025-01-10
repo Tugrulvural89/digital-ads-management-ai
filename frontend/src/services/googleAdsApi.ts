@@ -1,10 +1,19 @@
 import axios from "axios";
 import { Campaign } from "../types/campaign";
 
+
+
+const ALL_GOOGLE_ADS_FETCH_CAMPAIGNS_API_PATH = process.env.REACT_APP_ALL_GOOGLE_ADS_FETCH_CAMPAIGNS_API_PATH as string;
+
+if (!ALL_GOOGLE_ADS_FETCH_CAMPAIGNS_API_PATH) {
+  throw new Error('ALL_GOOGLE_ADS_ACCOUNTS_API_PATH must be defined in environment variables');
+}
+
+
 export const fetchCampaigns = async (): Promise<Campaign[]> => {
   try {
     const response = await axios.post(
-      "http://localhost:8000/api/v1/google/fetch-campaigns",
+      ALL_GOOGLE_ADS_FETCH_CAMPAIGNS_API_PATH,
       {}, // Request body burada boş olabilir, çünkü API sadece başlık bilgisi (Authorization) istiyor
       {
         headers: {

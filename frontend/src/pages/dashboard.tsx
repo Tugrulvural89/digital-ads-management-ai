@@ -37,6 +37,7 @@ const Dashboard: React.FC = () => {
           <p className="mt-2">Here is your dashboard content.</p>
 
           {/* Google Ads Integration */}
+          
           <GoogleAdsConnectWrapper />
         </main>
       </div>

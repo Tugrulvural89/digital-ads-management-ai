@@ -56,7 +56,6 @@ async def fetch_campaigns(db: Session = Depends(get_db), current_user: User = De
         raise HTTPException(status_code=500, detail=f"Error fetching campaigns: {str(e)}")
 
 
-
 @router.post("/auth")
 async def auth_google(request: GoogleGetAuthResponse, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
