@@ -9,14 +9,6 @@ logger = logging.getLogger(__name__)
 
 class GoogleAdsService:
     def __init__(self, credentials: Dict[str, str], developer_token: str, login_customer_id: Optional[str] = None):
-        """
-        Initialize the Google Ads service.
-
-        Args:
-            credentials (Dict[str, str]): Google OAuth2 credentials (token, refresh_token, etc.).
-            developer_token (str): Google Ads developer token.
-            login_customer_id (Optional[str]): Login customer ID for managing accounts.
-        """
         self.credentials = Credentials(
             token=credentials.get('token'),
             refresh_token=credentials.get('refresh_token'),
@@ -29,77 +21,69 @@ class GoogleAdsService:
         self.login_customer_id = login_customer_id
 
     def _get_client(self) -> GoogleAdsClient:
-        """
-        Create and return a Google Ads client.
-
-        Returns:
-            GoogleAdsClient: Authenticated Google Ads client.
-        """
         return GoogleAdsClient(
             credentials=self.credentials,
             developer_token=self.developer_token,
             login_customer_id=self.login_customer_id
         )
 
-    def get_reports(self, customer_id: str, query: str) -> List[Dict]:
+    def fetch_campaigns(self, customer_id: str) -> List[Dict]:
         """
-        Fetch reports from Google Ads API.
+        Fetch campaigns and metrics from Google Ads API.
 
         Args:
-            customer_id (str): Google Ads customer ID.
-            query (str): GAQL (Google Ads Query Language) query.
+            customer_id (str): Customer ID of the Google Ads account.
 
         Returns:
-            List[Dict]: List of report data.
+            List[Dict]: List of campaign data.
         """
         try:
             client = self._get_client()
-            google_ads_service = client.get_service("GoogleAdsService")
-            response = google_ads_service.search(customer_id=customer_id, query=query)
-            results = []
-            for row in response:
-                campaign = row.campaign
-                metrics = row.metrics
-                results.append({
-                    'campaign_id': campaign.id,
-                    'campaign_name': campaign.name,
-                    'impressions': metrics.impressions,
-                    'clicks': metrics.clicks,
-                    'cost': metrics.cost_micros / 1e6  # Convert micros to currency
-                })
-            return results
-        except GoogleAdsException as e:
-            logger.error(f"Google Ads API error: {e}")
-            raise
-        except RefreshError as e:
-            logger.error(f"Token refresh error: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            raise
-
-    def get_ad_accounts(self, customer_id: str) -> List[Dict]:
-        try:
-            client = self._get_client()
-            google_ads_service = client.get_service("GoogleAdsService")
+            ga_service = client.get_service("GoogleAdsService")
             query = """
-                SELECT customer_client.client_customer, customer_client.descriptive_name
-                FROM customer_client
-                WHERE customer_client.level = 1
+                SELECT 
+                    campaign.id, 
+                    campaign.name, 
+                    campaign.status, 
+                    metrics.clicks, 
+                    metrics.ctr, 
+                    metrics.cost_micros,
+                    metrics.all_conversions_value
+                FROM 
+                    campaign
+                WHERE 
+                    segments.date DURING LAST_7_DAYS
+                ORDER BY 
+                    campaign.id
             """
-            response = google_ads_service.search(customer_id=customer_id, query=query)
-            results = []
+            response = ga_service.search(customer_id=customer_id, query=query)
+
+            # Enum eşlemesi
+            CAMPAIGN_STATUS_MAP = {
+                0: "UNSPECIFIED",
+                1: "UNKNOWN",
+                2: "ENABLED",
+                3: "PAUSED",
+                4: "REMOVED",
+            }
+
+            # Process the response
+            campaigns = []
             for row in response:
-                results.append({
-                    'account_id': row.customer_client.client_customer,
-                    'name': row.customer_client.descriptive_name
+                campaigns.append({
+                    "campaign_id": row.campaign.id,
+                    "name": row.campaign.name,
+                    "status": CAMPAIGN_STATUS_MAP.get(row.campaign.status, "UNKNOWN"), 
+                    "clicks": row.metrics.clicks,
+                    "ctr": row.metrics.ctr,
+                    "cost": row.metrics.cost_micros / 1_000_000,  # Convert micros to standard currency
+                    "conversion_value": row.metrics.all_conversions_value
                 })
-            return results
-        except GoogleAdsException as e:
-            logger.error(f"Google Ads API error: {e}")
+            return campaigns
+
+        except GoogleAdsException as ex:
+            logging.error(f"Google Ads API error: {ex}")
             raise
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
+            logging.error(f"Unexpected error: {e}")
             raise
-
-        

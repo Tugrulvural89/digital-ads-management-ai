@@ -19,10 +19,6 @@ class User(Base):
 
     ad_accounts = relationship("AdAccount", back_populates="user")
 
-class ChannelType(str, Enum):
-    GOOGLE = "google"
-    FACEBOOK = "facebook"
-
 
 class AdAccount(Base):
     __tablename__ = 'ad_accounts'

@@ -2,15 +2,23 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 
+class TokenRequest(BaseModel):
+    user_email: str
+    password: str
 
 class GoogleCredentials(BaseModel):
     access_token: str
-    scope: str
-    refresh_token: Optional[str] = None  # Optional field for refresh token
-    expires_in: Optional[int] = None  # Optional field for token expiry in seconds
-    token_type: Optional[str] = None  # Optional field for token type (e.g., 'Bearer')
+    refresh_token: str
 
-    
+
+
+class SaveAdAccountRequest(BaseModel):
+    account_id: str
+    channel: str
+
+class AccessTokenRequest(BaseModel):
+    access_token: str
+
 
 class Token(BaseModel):
     access_token: str
@@ -106,6 +114,8 @@ class GoogleLoginResponse(BaseModel):
     message: str
     google_ads_account_id: Optional[str] = None
 
+class GoogleGetAuthResponse(BaseModel):
+    code: str
 
 class GoogleSignInRequest(BaseModel):
     credential: str  # Google credential response

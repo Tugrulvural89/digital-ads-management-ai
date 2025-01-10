@@ -8,17 +8,15 @@ interface AdAccount {
   name: string;
 }
 
-const GoogleAdsConnectWrapper: React.FC = () => {
-  const apiKey = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID as string;
 
-  // Eğer apiKey yoksa hata veririz ya da kullanıcıya mesaj gösteririz
-  if (!apiKey) {
-    console.error("Google Client ID is missing!");
-    return <div>Error: Google Client ID is missing.</div>;
-  }
-  
+if (!GOOGLE_CLIENT_ID) {
+  throw new Error('REACT_APP_GOOGLE_CLIENT_ID must be defined in environment variables');
+}
+
+const GoogleAdsConnectWrapper: React.FC = () => {
   return (
-    <GoogleOAuthProvider clientId={apiKey}>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <GoogleAdsConnect />
     </GoogleOAuthProvider>
   );
@@ -30,43 +28,65 @@ const GoogleAdsConnect: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [token, setToken] = useState<string>('');
+  const [refreshToken, setRefreshToken] = useState<string>('');
 
-
+  // Google login with Auth Code Flow
   const googleLogin = useGoogleLogin({
     scope: 'https://www.googleapis.com/auth/adwords',
-    onSuccess: async (tokenResponse) => {
+    flow: 'auth-code',
+    onSuccess: async (response) => {
+      console.log('Google login response:', response);
       try {
         setIsLoading(true);
         setError('');
 
-
+        const { code } = response; // Yetkilendirme kodunu al
+        console.log('Access Token:', code);
+        // Yetkilendirme kodunu access token ve refresh token için backend'e gönder
+        const tokenResponse = await axios.post('http://localhost:8000/api/v1/google/auth', {
+          code: code || '',
+        }, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          }
+        }
+        );
+        console.log('tokenResponse  response:', tokenResponse);
+       
+        const { access_token, refresh_token } = tokenResponse.data;
         // Save Google credentials to the server
-        await axios.post('http://localhost:8000/api/v1/save-credentials', {
-          credentials: {
-            access_token: tokenResponse.access_token,
-            scope: 'https://www.googleapis.com/auth/adwords',
-            expires_in: tokenResponse.expires_in,
-            token_type: tokenResponse.token_type,
-          },
-          user_email: "admin@admin.com", 
+        const response_save = await axios.post('http://localhost:8000/api/v1/save-credentials', {
+          access_token: access_token,  // Doğrudan token bilgilerini gönder
+          refresh_token: refresh_token
+        }, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+            "Content-Type": "application/json",
+          }
         });
 
-        console.log(tokenResponse.access_token);
-        // Fetch Google Ads accounts using the Google token
-        const response = await axios.post('http://localhost:8000/api/v1/google-ad-accounts', {
-          access_token: tokenResponse.access_token.toString(),
-        });
-        console.log(response.data)
+        console.log('tokenResponse  response:', response_save);
 
-         // Parse the resourceNames and map them to AdAccount objects
-         const accounts = response.data.resourceNames.map((resourceName: string) => {
+        console.log('Access Token:', access_token);
+        console.log('Refresh Token:', refresh_token);
+
+        // Fetch Google Ads accounts
+        const responseAdAccounts = await axios.post('http://localhost:8000/api/v1/google-ad-accounts', {
+          access_token,
+        });
+
+        const accounts = responseAdAccounts.data.resourceNames.map((resourceName: string) => {
           const accountId = resourceName.split('/')[1];
+          const accountName = resourceName.split('/')[0];
           return {
             account_id: accountId,
-            name: `Account ${accountId}`,
+            name: `Account ${accountName}`,
           };
         });
+
         setAdAccounts(accounts);
+
       } catch (err) {
         setError('Failed to fetch Google Ads accounts');
         console.error(err);
@@ -79,7 +99,6 @@ const GoogleAdsConnect: React.FC = () => {
     },
   });
 
-
   const handleSubmit = async () => {
     if (!selectedAccount) {
       setError('Please select an account');
@@ -90,11 +109,13 @@ const GoogleAdsConnect: React.FC = () => {
       setIsSubmitting(true);
       setError('');
 
-      // Send the selected account to the backend
       const response = await axios.post('http://localhost:8000/api/v1/save-ad-account', {
         account_id: selectedAccount,
-        user_email: "admin@admin.com", // Replace with the actual user email
-        channel: "Google"
+        channel: "Google",
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+        },
       });
 
       console.log('Account saved:', response.data);
@@ -107,7 +128,6 @@ const GoogleAdsConnect: React.FC = () => {
     }
   };
 
-
   return (
     <div className="p-4">
       <button
@@ -119,7 +139,8 @@ const GoogleAdsConnect: React.FC = () => {
       </button>
 
       {error && <div className="text-red-500 mt-2">{error}</div>}
- {adAccounts.length > 0 && (
+
+      {adAccounts.length > 0 && (
         <div className="mt-4">
           <h3 className="text-lg font-semibold">Select Google Ads Account:</h3>
           <div className="space-y-2 mt-2">

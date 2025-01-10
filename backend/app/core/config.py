@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     PROJECT_NAME : str = "Ads Dashboard"
     API_V1_STR: str = "/api/v1"
+    API_V1_STR_GOOGLE: str = "/api/v1/google"
     DB_URL: str
     SECRET_KEY: str
     ALGORITHM: str
@@ -26,6 +27,7 @@ class Settings(BaseSettings):
     #GOOGLE_REFRESH_TOKEN: str
     GOOGLE_DEVELOPER_TOKEN: str
     GOOGLE_MANAGER_ID: str  
+    GOOGLE_REDIRECT_URI: str  
 
     class Config:
         case_sensitive = True

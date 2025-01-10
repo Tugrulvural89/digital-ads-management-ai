@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api.auth import router
 from .core.config import settings
 from .db.base import Base
-
+from .api.auth import router as auth_router
+from .api.google_apis import router as google_router
 
 
 app = FastAPI()
@@ -21,9 +22,8 @@ if settings.BACKEND_CORS_ORIGINS:
     )
 
 
+# Auth işlemleri için router ekle
+app.include_router(auth_router)
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello, World!"}
-
-app.include_router(router, prefix=settings.API_V1_STR)
+# Google işlemleri için router ekle
+app.include_router(google_router)
